@@ -1,0 +1,33 @@
+read:
+cation1>> change Status Return Level to 1 inorder to return status packet for read command
+cation2>> It is recommended that Return Delay Time be set as the minimum value within the 
+allowed range of Main Controller
+
+1.apply torque to 2 dynamixel mx64r with id 1,2:(no status packet return as broadcast id)
+
+0xff 0xff 0xfe 0x0c 0x83 0x46 0x03 0x01 0x01 low1 high1 0x02 0x01 low2 high2 checksum
+hdr   hdr  BI  len  ins  s.Add len id1  dat1 dat2 dat3   id2 dat1 dat2 dat3   cs
+
+
+2.apply torque to id :
+0xff 0xff id 0x06 0x03 0x46 0x01 low high checksum
+
+
+3. current position and speed and load of id:
+0xff 0xff id 0x04 0x02 0x24 0x06 checksum
+return: FF FF id 0x08 ERR lowp highp lows highs lowl highl checksum
+
+4. current position  of id:
+0xff 0xff id 0x04 0x02 0x24 0x02 checksum
+return: FF FF id 0x04 ERR lowp highp checksum
+
+5. current load  of id:
+0xff 0xff id 0x04 0x02 0x28 0x02 checksum
+return: FF FF id 0x04 ERR lowl highl checksum
+
+
+
+
+
+
+
