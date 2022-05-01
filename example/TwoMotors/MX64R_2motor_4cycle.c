@@ -1,0 +1,353 @@
+/*
+ * Comunicate Two MX64R Dynamixel motor in 4 cycle  with a level 2 S-function.
+ * 1.Reading from first motor 2.Reading from second motor 3. Write Applied Torque on first motor 4.Write Applied Torque on second motor
+ * By Pedram Agand
+ * 
+ *
+ * Copyright 2014 Aras Lab, K.N. Tossi university of technology.
+ * 
+ * For more Information Contact: pedram_akand@yahoo.com
+ */
+
+
+/*
+ * You must specify the S_FUNCTION_NAME as the name of your S-function
+ * (i.e. replace sfuntmpl_basic with the name of your S-function).
+ */
+
+#define S_FUNCTION_NAME  MX64R_2motor_4cycle
+#define S_FUNCTION_LEVEL 2
+#define param_1 *mxGetPr(ssGetSFcnParam(S,0))
+#define param_2 *mxGetPr(ssGetSFcnParam(S,1))
+
+/*
+ * Need to include simstruc.h for the definition of the SimStruct and
+ * its associated macro definitions.
+ */
+#include "simstruc.h"
+#include "stdlib.h"
+#include "stdio.h"
+
+//Global variable
+  int_T cycle;
+  uint8_T  data[10] = { 0xff, 0xff, 0, 0, 0,0, 0, 0, 0,0};
+  uint8_T  output[12] = {0, 0,0,0,0,0,0,0,0,0,0,0}; 
+
+/*====================*
+ * S-function methods *
+ *====================*/
+
+/* Function: mdlInitializeSizes ===============================================
+ * Abstract:
+ *    The sizes information is used by Simulink to determine the S-function
+ *    block's characteristics (number of inputs, outputs, states, etc.).
+ */
+static void mdlInitializeSizes(SimStruct *S)
+{
+    /* See sfuntmpl_doc.c for more details on the macros below */
+      
+    ssSetNumSFcnParams(S, 2);  /* Number of expected parameters */
+    if (ssGetNumSFcnParams(S) != ssGetSFcnParamsCount(S)) {
+        /* Return if number of expected != number of actual parameters */
+        ssSetErrorStatus(S,"Parameter assignment failed! \nplease enter the parameter as connected motor ID1 and motor ID2 ");
+        return;
+    }
+    
+    cycle=0;
+    
+    ssSetNumContStates(S, 0);
+    ssSetNumDiscStates(S, 0);
+
+    if (!ssSetNumInputPorts(S, 3)) return;
+    ssSetInputPortWidth(S, 0, 1);
+    ssSetInputPortWidth(S, 1, 1);
+    ssSetInputPortWidth(S, 2, 12);
+    ssSetInputPortDirectFeedThrough(S, 0, 1);
+    ssSetInputPortDirectFeedThrough(S, 1, 1);
+    ssSetInputPortDirectFeedThrough(S, 2, 1);
+
+    if (!ssSetNumOutputPorts(S, 7)) return;
+    ssSetOutputPortDataType(S, 6, SS_UINT8);
+    ssSetOutputPortWidth(S, 0, 1);
+    ssSetOutputPortWidth(S, 1 , 1);
+    ssSetOutputPortWidth(S, 2 , 1);
+    ssSetOutputPortWidth(S, 3 , 1);
+    ssSetOutputPortWidth(S, 4 , 1);
+    ssSetOutputPortWidth(S, 5 , 1);
+    ssSetOutputPortWidth(S, 6 , 10);
+
+    ssSetNumSampleTimes(S, 1);
+    ssSetNumRWork(S, 0);
+    ssSetNumIWork(S, 0);
+    ssSetNumPWork(S, 0);
+    ssSetNumModes(S, 0);
+    ssSetNumNonsampledZCs(S, 0);
+
+    /* Specify the sim state compliance to be same as a built-in block */
+    ssSetSimStateCompliance(S, USE_DEFAULT_SIM_STATE);
+
+    ssSetOptions(S, 0);
+
+}
+
+
+
+/* Function: mdlInitializeSampleTimes =========================================
+ * Abstract:
+ *    This function is used to specify the sample time(s) for your
+ *    S-function. You must register the same number of sample times as
+ *    specified in ssSetNumSampleTimes.
+ */
+static void mdlInitializeSampleTimes(SimStruct *S)
+{
+    ssSetSampleTime(S, 0, INHERITED_SAMPLE_TIME);
+    ssSetOffsetTime(S, 0, 0.0);
+
+}
+ 
+
+/* Function: mdlOutputs =======================================================
+ * Abstract:
+ *    In this function, you compute the outputs of your S-function
+ *    block.
+ */
+static void mdlOutputs(SimStruct *S, int_T tid)
+{
+   real_T a;
+    time_T t,ts,tf;
+    int_T checksum ,high,low,i,id1,id2;
+    InputRealPtrsType uPtrs1,uPtrs2,uPtrs3;
+    real_T *pos1,*veloc1,*load1,*pos2,*veloc2,*load2,TRQIN1,TRQIN2,cl1,cl2,cs1,cs2;
+    uint8_T *serialout= (uint8_T *)ssGetOutputPortSignal(S,6);
+    
+    uPtrs1=ssGetInputPortRealSignalPtrs(S,0);
+    uPtrs2=ssGetInputPortRealSignalPtrs(S,1);
+    uPtrs3=ssGetInputPortRealSignalPtrs(S,2);
+    
+     pos1=ssGetOutputPortRealSignal(S,0);
+   veloc1=ssGetOutputPortRealSignal(S,1);
+     load1=ssGetOutputPortRealSignal(S,2);      
+      pos2=ssGetOutputPortRealSignal(S,3);
+     veloc2=ssGetOutputPortRealSignal(S,4);
+     load2=ssGetOutputPortRealSignal(S,5);
+    
+    TRQIN1=*uPtrs1[0];
+    TRQIN2=*uPtrs2[0];
+  
+    id1=param_1;
+    id2=param_2;
+    
+      //read from serial port motor1
+     if(cycle==0  )
+     {
+  
+    
+         data[2]=id1;
+         data[3]=0x04;
+         data[4]=0x02;
+         data[5]=0x24;
+         data[6]=0x06;
+         checksum=~(id1+4+2+0x24+6);
+         data[7]=checksum;
+         data[8]=0;
+         data[9]=0;
+        
+         
+        for(i=0;i<10;i++)
+        serialout[i]=data[i];
+        
+     
+   
+     }
+    
+       //read from serial port motor2
+     if(cycle==2 )
+     {
+      
+     
+         data[2]=id2;
+         data[3]=0x04;
+         data[4]=0x02;
+         data[5]=0x24;
+         data[6]=0x06;
+         checksum=~(id2+4+2+0x24+6);
+         data[7]=checksum;
+         data[8]=0;
+         data[9]=0;
+        
+         
+        for(i=0;i<10;i++)
+        serialout[i]=data[i];
+        
+       
+     }
+ 
+    
+    
+    
+    
+       for (i=0; i<12; i++) 
+       output[i] = (uint8_T)*uPtrs3[i];
+        
+       if(output[2]==id1 ){
+      *pos1=(uint16_T)((output[5])+(uint16_T)(output[6])*256); 
+      cs1=(uint16_T)((output[7])+(uint16_T)(output[8])*256);
+      cl1=(uint16_T)((output[9])+(uint16_T)(output[10])*256);
+      
+      if((cs1<=1023) & (cs1>=0))
+         *veloc1=cs1;
+      else if ((cs1>=1024) & (cs1<=2047))
+          *veloc1=(-cs1+1024);
+      
+      if((cl1<=1023) & (cl1>=0))
+         *load1=cl1;
+      else if ((cl1>=1024) & (cl1<=2047))
+          *load1=(-cl1+1024);}
+    
+      
+       else if(output[2]==id2 ){
+      *pos2=(uint16_T)((output[5])+(uint16_T)(output[6])*256); 
+      cs2=(uint16_T)((output[7])+(uint16_T)(output[8])*256);
+      cl2=(uint16_T)((output[9])+(uint16_T)(output[10])*256);
+      
+      if((cs2<=1023) & (cs2>=0))
+         *veloc2=cs2;
+      else if ((cs2>=1024) & (cs2<=2047))
+          *veloc2=(-cs2+1024);
+      
+      if((cl2<=1023) & (cl2>=0))
+         *load2=cl2;
+      else if ((cl1>=1024) & (cl1<=2047))
+          *load2=(-cl2+1024);}
+      
+      
+    
+ //write to serial port motor1
+     if (cycle==3)
+      {
+     if ((TRQIN1>=0) & (TRQIN1<=6))
+        a= TRQIN1*1023/6;
+        else if((TRQIN1<0) & (TRQIN1>=-6))
+        a=-TRQIN1*1023/6+1024;
+        else if (TRQIN1<-6)
+         a=-6;
+        else if (TRQIN1>6)
+         a=6;
+        else
+         a=0;
+     
+    high=(int_T)(a/256);
+    low=(int_T)(a-high*256);
+    data[2]=id1;
+    data[3]=0x06;
+    data[4]=0x03;
+    data[5]=0x46;
+    data[6]=0x01;
+    data[7]=low;
+    data[8]=high;
+    checksum=~(id1+6+3+1+high+low+0x46);
+    data[9]=checksum;
+    
+    
+      for(i=0;i<10;i++)
+      serialout[i]=data[i];
+     }  
+      
+     //write to serial port motor2
+    
+     if (cycle==1)
+      {
+       if ((TRQIN2>=0) & (TRQIN2<=6))
+        a= TRQIN2*1023/6;
+        else if((TRQIN2<0) & (TRQIN2>=-6))
+        a=-TRQIN2*1023/6+1024;
+        else if (TRQIN2<-6)
+         a=-6;
+        else if (TRQIN2>6)
+         a=6;
+        else
+         a=0;
+       
+    high=(int_T)(a/256);
+    low=(int_T)(a-high*256);
+    data[2]=id2;
+    data[3]=0x06;
+    data[4]=0x03;
+    data[5]=0x46;
+    data[6]=0x01;
+    data[7]=low;
+    data[8]=high;
+    checksum=~(id2+6+3+1+high+low+0x46);
+    data[9]=checksum;
+    
+    
+      for(i=0;i<10;i++)
+      serialout[i]=data[i];
+     }
+    
+    // Termination Assignment
+       t= ssGetT(S);
+       ts=ssGetSampleTime(S, 0);
+       tf= ssGetTFinal(S);
+       if(t+ts==tf){
+     data[2]=id1;
+    data[3]=0x06;
+    data[4]=0x03;
+    data[5]=0x46;
+    data[6]=0x01;
+    data[7]=0;
+    data[8]=0;
+    checksum=~(id1+6+3+1+0x46);
+    data[9]=checksum;
+    
+      for(i=0;i<10;i++)
+      serialout[i]=data[i];  
+       }
+       
+        if(t==tf){
+     data[2]=id2;      
+    data[3]=0x06;
+    data[4]=0x03;
+    data[5]=0x46;
+    data[6]=0x01;
+    data[7]=0;
+    data[8]=0;
+    checksum=~(id1+6+3+1+0x46);
+    data[9]=checksum;
+    
+      for(i=0;i<10;i++)
+      serialout[i]=data[i];   
+       }   
+    
+    
+    cycle++;
+     if(cycle==4)
+     cycle=0;
+   
+     
+}
+
+/* Function: mdlTerminate =====================================================
+ * Abstract:
+ *    In this function, you should perform any actions that are necessary
+ *    at the termination of a simulation.  For example, if memory was
+ *    allocated in mdlStart, this is the place to free it.
+ */
+static void mdlTerminate(SimStruct *S)
+{
+}
+
+
+/*======================================================*
+ * See sfuntmpl_doc.c for the optional S-function methods *
+ *======================================================*/
+
+/*=============================*
+ * Required S-function trailer *
+ *=============================*/
+
+#ifdef  MATLAB_MEX_FILE    /* Is this file being compiled as a MEX-file? */
+#include "simulink.c"      /* MEX-file interface mechanism */
+#else
+#include "cg_sfun.h"       /* Code generation registration function */
+#endif
